@@ -43,7 +43,10 @@ if (PASS) {
     if (req.path === '/api/health') return next();
     // Check Authorization header (Bearer token) or ?pass= query param
     const auth = req.headers['authorization'] || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : req.query.pass;
+    const cookies = req.headers['cookie'] || '';
+    const cookieMatch = cookies.split(';').find(c => c.trim().startsWith('dp='));
+    const cookieToken = cookieMatch ? cookieMatch.trim().slice(3) : '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.pass || cookieToken);
     if (token === PASS) return next();
     // No valid token — serve login page
     if (req.path === '/login' || req.path === '/login.html') return next();
