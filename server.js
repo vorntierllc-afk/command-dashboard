@@ -39,13 +39,13 @@ app.use(express.json({ limit: '4mb' }));
 const PASS = process.env.DASHBOARD_PASS;
 if (PASS) {
   app.use((req, res, next) => {
-    // Allow health check without auth
-    if (req.path === '/api/health') return next();
+    // Allow health + auth check without auth
+    if (req.path === '/api/health' || req.path === '/api/auth') return next();
     // Check Authorization header (Bearer token) or ?pass= query param
     const auth = req.headers['authorization'] || '';
     const cookies = req.headers['cookie'] || '';
     const cookieMatch = cookies.split(';').find(c => c.trim().startsWith('dp='));
-    const cookieToken = cookieMatch ? cookieMatch.trim().slice(3) : '';
+    const cookieToken = cookieMatch ? decodeURIComponent(cookieMatch.trim().slice(3)) : '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : (req.query.pass || cookieToken);
     if (token === PASS) return next();
     // No valid token — serve login page
@@ -62,9 +62,9 @@ button:hover{background:#3d7ef6}.err{color:#f74f4f;font-size:13px;margin-top:12p
 <input type="password" id="p" placeholder="Password" onkeydown="if(event.key==='Enter')go()">
 <button onclick="go()">Enter</button><div class="err" id="e">Wrong password</div></div>
 <script>function go(){const p=document.getElementById('p').value;
-fetch('/api/health',{headers:{'Authorization':'Bearer '+p}}).then(r=>{
-if(r.ok){document.cookie='dp='+p+';path=/;max-age=2592000';location.href='/?pass='+p;}
-else{document.getElementById('e').style.display='block';}});}</script></body></html>`);
+fetch('/api/auth',{headers:{'Authorization':'Bearer '+p}}).then(r=>r.json()).then(j=>{
+if(j.ok){document.cookie='dp='+encodeURIComponent(p)+';path=/;max-age=2592000';location.href='/';}
+else{document.getElementById('e').style.display='block';}}).catch(()=>{document.getElementById('e').style.display='block';});}</script></body></html>`);
     }
     res.status(401).json({ error: 'Unauthorized' });
   });
@@ -146,6 +146,13 @@ app.put('/api/settings/:id', (req, res) => {
   else rows[idx] = { ...req.body, id };
   writeStore('settings', rows);
   res.json({ ok: true });
+});
+
+// ── Auth check (used by login page) ──────────────────────────────────────────
+app.get('/api/auth', (req, res) => {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : req.query.pass;
+  res.json({ ok: !PASS || token === PASS });
 });
 
 // ── Health ────────────────────────────────────────────────────────────────────
